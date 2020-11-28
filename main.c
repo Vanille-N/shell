@@ -48,7 +48,17 @@ int execute (struct cmd *cmd)
 {
 	switch (cmd->type)
 	{
-	    case C_PLAIN:
+	    case C_PLAIN: {
+                int cpid;
+            if ((cpid = fork())) {
+                int status;
+                printf("Main shell waiting for %d\n", cpid);
+                waitpid(cpid, &status, 0);
+                return status;
+            } else {
+                execvp(cmd->args[0], cmd->args);
+            }
+        }
 	    case C_SEQ:
 	    case C_AND:
 	    case C_OR:
