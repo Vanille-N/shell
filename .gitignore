@@ -1,0 +1,10 @@
+*
+!enonce.pdf
+!global.h
+!lex.l
+!main.c
+!Makefile
+!output.c
+!parse.y
+!README.md
+!.gitignore
