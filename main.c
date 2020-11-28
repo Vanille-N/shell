@@ -66,9 +66,12 @@ int execute (struct cmd *cmd)
                 execvp(cmd->args[0], cmd->args);
             }
         }
-	    case C_SEQ:
 	    case C_AND:
 	    case C_OR:
+	    case C_SEQ: {
+            execute(cmd->left);
+            return execute(cmd->right);
+        }
 	    case C_PIPE:
 	    case C_VOID:
 		errmsg("I do not know how to do this, please help me!");
