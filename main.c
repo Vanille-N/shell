@@ -66,10 +66,18 @@ int execute (struct cmd *cmd)
                 execvp(cmd->args[0], cmd->args);
             }
         }
-	    case C_AND:
-	    case C_OR:
 	    case C_SEQ: {
             execute(cmd->left);
+            return execute(cmd->right);
+        }
+	    case C_AND: {
+            int status = execute(cmd->left);
+            if (status) return status;
+            return execute(cmd->right);
+        }
+	    case C_OR: {
+            int status = execute(cmd->left);
+            if (!status) return status;
             return execute(cmd->right);
         }
 	    case C_PIPE:
