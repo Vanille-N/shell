@@ -49,11 +49,18 @@ int execute (struct cmd *cmd)
 	switch (cmd->type)
 	{
 	    case C_PLAIN: {
-                int cpid;
+            int cpid;
             if ((cpid = fork())) {
                 int status;
                 printf("Main shell waiting for %d\n", cpid);
                 waitpid(cpid, &status, 0);
+                if (WIFEXITED(status)) {
+                    status = WEXITSTATUS(status);
+                    printf("Exited with code %d\n", status);
+                } else {
+                    printf("Unknown command '%s'\n", cmd->args[0]);
+                    status = 255;
+                }
                 return status;
             } else {
                 execvp(cmd->args[0], cmd->args);
