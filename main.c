@@ -52,13 +52,11 @@ int execute (struct cmd *cmd)
             int cpid;
             if ((cpid = fork())) {
                 int status;
-                printf("Main shell waiting for %d\n", cpid);
                 waitpid(cpid, &status, 0);
                 if (WIFEXITED(status)) {
                     status = WEXITSTATUS(status);
-                    printf("Exited with code %d\n", status);
                 } else {
-                    printf("Unknown command '%s'\n", cmd->args[0]);
+                    fprintf(stderr, "Unknown command '%s'\n", cmd->args[0]);
                     status = 255;
                 }
                 return status;
@@ -99,6 +97,25 @@ int execute (struct cmd *cmd)
                 int retcode = execute(cmd->right);
                 exit(retcode);
             } else {
+                // parent: close pipe and wait for children
+                close(tube[0]); close(tube[1]);
+                int status1, status2, status;
+                waitpid(pid1, &status1, 0);
+                waitpid(pid2, &status2, 0);
+                if (WIFEXITED(status1)) {
+                    if (WIFEXITED(status2)) {
+                        status1 = WEXITSTATUS(status1);
+                        status2 = WEXITSTATUS(status2);
+                        if (status1) { status = status1; } else { status = status2; }
+                    } else {
+                        fprintf(stderr, "Unknown command '%s'\n", cmd->right->args[0]);
+                        status = 255;
+                    }
+                } else {
+                    fprintf(stderr, "Unknown command '%s'\n", cmd->left->args[0]);
+                    status = 255;
+                }
+                return status;
             }
         }
 	    case C_VOID:
