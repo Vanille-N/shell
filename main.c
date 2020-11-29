@@ -80,7 +80,21 @@ int execute (struct cmd *cmd)
             if (!status) return status;
             return execute(cmd->right);
         }
-	    case C_PIPE:
+	    case C_PIPE: {
+            int tube [2];
+            pipe(tube);
+            int pid1, pid2;
+            if (!(pid1 = fork())) {
+                // first child: execute left, pipe output
+                close(tube[0]);
+                dup2(tube[1], STDOUT_FILENO);
+                close(tube[1]);
+                int retcode = execute(cmd->left);
+                exit(retcode);
+            } else if (!(pid2 = fork())) {
+            } else {
+            }
+        }
 	    case C_VOID:
 		errmsg("I do not know how to do this, please help me!");
 		return -1;
