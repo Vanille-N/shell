@@ -92,6 +92,12 @@ int execute (struct cmd *cmd)
                 int retcode = execute(cmd->left);
                 exit(retcode);
             } else if (!(pid2 = fork())) {
+                // second child: execute left, pipe input
+                close(tube[1]);
+                dup2(tube[0], STDIN_FILENO);
+                close(tube[0]);
+                int retcode = execute(cmd->right);
+                exit(retcode);
             } else {
             }
         }
