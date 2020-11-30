@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include "global.h"
 
@@ -44,12 +45,16 @@ void apply_redirects (struct cmd *cmd)
 // The structure of the command is explained in output.c.
 // Returns the exit code of the command in question.
 
-int execute (struct cmd *cmd)
+int execute (struct cmd* cmd)
 {
 	switch (cmd->type)
 	{
 	    case C_PLAIN: {
             int cpid;
+            if (strcmp(cmd->args[0], "exit") == 0) {
+                printf("goodbye.\n");
+                exit(0);
+            }
             if ((cpid = fork())) {
                 int status;
                 waitpid(cpid, &status, 0);
@@ -118,8 +123,23 @@ int execute (struct cmd *cmd)
                 return status;
             }
         }
-	    case C_VOID:
-		errmsg("I do not know how to do this, please help me!");
+	    case C_VOID: {
+            int cpid;
+            if ((cpid = fork())) {
+                int status;
+                waitpid(cpid, &status, 0);
+                if (WIFEXITED(status)) {
+                    status = WEXITSTATUS(status);
+                } else {
+                    fprintf(stderr, "Some error occured\n");
+                    status = 254;
+                }
+                return status;
+            } else {
+                int status = execute(cmd->left);
+                exit(status);
+            }
+        }
 		return -1;
 	}
 
@@ -132,9 +152,10 @@ int main (int argc, char **argv)
 {
 	char *prompt = malloc(strlen(NAME)+3);
 	printf("welcome to %s!\n", NAME);
-	sprintf(prompt,"%s> ", NAME);
+	sprintf(prompt,"%s(%d)> ", NAME, getpid());
 
-	while (1)
+    bool loop = true;
+	while (loop)
 	{
 		char *line = readline(prompt);
 		if (!line) break;	// user pressed Ctrl+D; quit shell
@@ -145,7 +166,7 @@ int main (int argc, char **argv)
 		struct cmd *cmd = parser(line);
 		if (!cmd) continue;	// some parse error occurred; ignore
 		//output(cmd,0);	// activate this for debugging
-		execute(cmd);
+        execute(cmd);
 	}
 
 	printf("goodbye!\n");
