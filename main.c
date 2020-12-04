@@ -26,11 +26,13 @@ void errmsg (char *msg) {
 }
 
 bool interrupted = false;
+// signal handler so that SIGINT does not kill main
 void stay_on_ctrlc () {
     printf("  SIGINT\n");
     interrupted = true;
 }
 
+// signal handler so that SIGINT kills children
 void exit_on_ctrlc () {
     exit(131);
 }
@@ -53,8 +55,8 @@ int retcode(char* arg) {
 // than overwritten.
 
 void apply_redirects (struct cmd *cmd) {
-    if (cmd->output) { dup2(open(cmd->output, O_WRONLY | O_CREAT, 0644), STDOUT_FILENO); }
-    if (cmd->error) { dup2(open(cmd->error, O_WRONLY | O_CREAT, 0644), STDERR_FILENO); }
+    if (cmd->output) { dup2(open(cmd->output, O_WRONLY | O_CREAT | O_TRUNC, 0644), STDOUT_FILENO); }
+    if (cmd->error) { dup2(open(cmd->error, O_WRONLY | O_CREAT | O_TRUNC, 0644), STDERR_FILENO); }
     if (cmd->input) { dup2(open(cmd->input, O_RDONLY, 0444), STDIN_FILENO); }
     if (cmd->append) { dup2(open(cmd->append, O_APPEND | O_WRONLY | O_CREAT, 0644), STDOUT_FILENO); }
 }
@@ -67,6 +69,7 @@ int execute (struct cmd* cmd, bool is_toplevel) {
     switch (cmd->type) {
         case C_PLAIN: {
             int cpid;
+            // exit is a builtin, not an external command
             if (strcmp(cmd->args[0], "exit") == 0) {
                 printf("goodbye.\n");
                 exit(retcode(cmd->args[1]));
@@ -81,11 +84,12 @@ int execute (struct cmd* cmd, bool is_toplevel) {
                         printf("Exited with nonzero status %d\n", status);
                     }
                 } else if (status == 2) {
-                    // Interrupt
+                    // interrupt
                     printf("  SIGINT\n");
                     interrupted = true;
                     status = 130;
                 } else {
+                    // something wrong happened, assume it's because command is undefined
                     fprintf(stderr, "Unknown command '%s'\n", cmd->args[0]);
                     status = 255;
                 }
@@ -126,7 +130,7 @@ int execute (struct cmd* cmd, bool is_toplevel) {
                 int retcode = execute(cmd->left, false);
                 exit(retcode);
             } else if (!(pid2 = fork())) {
-                // second child: execute left, pipe input
+                // second child: execute right, pipe input
                 signal(SIGINT, exit_on_ctrlc);
                 close(tube[1]);
                 dup2(tube[0], STDIN_FILENO);
@@ -174,6 +178,7 @@ int execute (struct cmd* cmd, bool is_toplevel) {
                 }
                 return status;
             } else {
+                // child
                 apply_redirects(cmd);
                 int status = execute(cmd->left, false);
                 exit(status);
@@ -188,9 +193,9 @@ int execute (struct cmd* cmd, bool is_toplevel) {
 }
 
 int main (int argc, char** argv) {
-    char* prompt = malloc(strlen(NAME)+3);
+    char* prompt = malloc(strlen(NAME)+10);
     printf("welcome to %s!\n", NAME);
-    sprintf(prompt,"%s(%d)> ", NAME, getpid());
+    sprintf(prompt,"(%d) %s> ", getpid(), NAME);
 
     signal(SIGINT, stay_on_ctrlc);
 
@@ -198,12 +203,16 @@ int main (int argc, char** argv) {
     while (loop) {
         interrupted = false;
         char* line = readline(prompt);
-        if (interrupted) continue;
+        if (interrupted) continue; // user pressed Ctrl+C; wait for next command after the newline
         if (!line) break; // user pressed Ctrl+D; quit shell
         if (!*line) continue; // empty line
         add_history (line); // add line to history
         struct cmd *cmd = parser(line);
-        if (!cmd) continue; // some parse error occurred; ignore
+        if (!cmd) {
+            // some parse error occurred; ignore
+            printf("Parsing error\n");
+            continue;
+        }
         //output(cmd,0); // activate this for debugging
         execute(cmd, true);
     }
