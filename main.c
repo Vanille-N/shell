@@ -35,6 +35,17 @@ void exit_on_ctrlc () {
     exit(131);
 }
 
+// return code from string
+int retcode(char* arg) {
+    int total = 0;
+    if (arg == NULL) return 0;
+    for (char* c = arg; *c != '\0' && '0' <= *c && *c <= '9'; c++) {
+        total = total * 10 + *c - '0';
+    }
+    return total;
+}
+
+
 // apply_redirects() should modify the file descriptors for standard
 // input/output/error (0/1/2) of the current process to the files
 // whose names are given in cmd->input/output/error.
@@ -58,7 +69,7 @@ int execute (struct cmd* cmd) {
             int cpid;
             if (strcmp(cmd->args[0], "exit") == 0) {
                 printf("goodbye.\n");
-                exit(0);
+                exit(retcode(cmd->args[1]));
             }
             if ((cpid = fork())) {
                 int status;

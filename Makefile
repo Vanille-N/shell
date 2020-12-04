@@ -22,5 +22,12 @@ lex.c: lex.l
 
 # clean
 
-clean: 
+clean:
 	rm -f shell $(OBJECTS) $(TMPFILES) core* *.o
+	rm -rf NVILLANI-Shell
+
+final:
+	make clean
+	mkdir NVILLANI-Shell
+	cp global.h lex.l main.c Makefile output.c parse.y NVILLANI-Shell/
+	tar czf NVILLANI-Shell.tar.gz NVILLANI-Shell
