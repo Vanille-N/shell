@@ -14,7 +14,7 @@
 // This is the file that you should work on.
 
 // declaration
-int execute (struct cmd *cmd);
+int execute (struct cmd *cmd, bool is_toplevel);
 
 // name of the program, to be printed in several places
 #define NAME "myshell"
@@ -63,7 +63,7 @@ void apply_redirects (struct cmd *cmd) {
 // The structure of the command is explained in output.c.
 // Returns the exit code of the command in question.
 
-int execute (struct cmd* cmd) {
+int execute (struct cmd* cmd, bool is_toplevel) {
     switch (cmd->type) {
         case C_PLAIN: {
             int cpid;
@@ -77,6 +77,9 @@ int execute (struct cmd* cmd) {
                 waitpid(cpid, &status, 0);
                 if (WIFEXITED(status)) {
                     status = WEXITSTATUS(status);
+                    if (is_toplevel && status != 0) {
+                        printf("Exited with nonzero status %d\n", status);
+                    }
                 } else if (status == 2) {
                     // Interrupt
                     printf("  SIGINT\n");
@@ -94,21 +97,21 @@ int execute (struct cmd* cmd) {
             }
         }
         case C_SEQ: {
-            execute(cmd->left);
-            if (interrupted) return 131;
-            return execute(cmd->right);
+            execute(cmd->left, false);
+            if (interrupted) return 130;
+            return execute(cmd->right, false);
         }
         case C_AND: {
-            int status = execute(cmd->left);
+            int status = execute(cmd->left, false);
             if (status) return status;
-            if (interrupted) return 131;
-            return execute(cmd->right);
+            if (interrupted) return 130;
+            return execute(cmd->right, false);
         }
         case C_OR: {
-            int status = execute(cmd->left);
+            int status = execute(cmd->left, false);
             if (!status) return status;
-            if (interrupted) return 131;
-            return execute(cmd->right);
+            if (interrupted) return 130;
+            return execute(cmd->right, false);
         }
         case C_PIPE: {
             int tube [2];
@@ -120,7 +123,7 @@ int execute (struct cmd* cmd) {
                 close(tube[0]);
                 dup2(tube[1], STDOUT_FILENO);
                 close(tube[1]);
-                int retcode = execute(cmd->left);
+                int retcode = execute(cmd->left, false);
                 exit(retcode);
             } else if (!(pid2 = fork())) {
                 // second child: execute left, pipe input
@@ -128,7 +131,7 @@ int execute (struct cmd* cmd) {
                 close(tube[1]);
                 dup2(tube[0], STDIN_FILENO);
                 close(tube[0]);
-                int retcode = execute(cmd->right);
+                int retcode = execute(cmd->right, false);
                 exit(retcode);
             } else {
                 // parent: close pipe and wait for children
@@ -141,6 +144,9 @@ int execute (struct cmd* cmd) {
                         status1 = WEXITSTATUS(status1);
                         status2 = WEXITSTATUS(status2);
                         if (status1) { status = status1; } else { status = status2; }
+                        if (is_toplevel && status != 0) {
+                            printf("Exited with nonzero status %d\n", status);
+                        }
                     } else {
                         fprintf(stderr, "Unknown command '%s'\n", cmd->right->args[0]);
                         status = 255;
@@ -159,6 +165,9 @@ int execute (struct cmd* cmd) {
                 waitpid(cpid, &status, 0);
                 if (WIFEXITED(status)) {
                     status = WEXITSTATUS(status);
+                    if (is_toplevel && status != 0) {
+                        printf("Exited with nonzero status %d\n", status);
+                    }
                 } else {
                     fprintf(stderr, "Some error occured\n");
                     status = 254;
@@ -166,7 +175,7 @@ int execute (struct cmd* cmd) {
                 return status;
             } else {
                 apply_redirects(cmd);
-                int status = execute(cmd->left);
+                int status = execute(cmd->left, false);
                 exit(status);
             }
         }
@@ -196,7 +205,7 @@ int main (int argc, char** argv) {
         struct cmd *cmd = parser(line);
         if (!cmd) continue; // some parse error occurred; ignore
         //output(cmd,0); // activate this for debugging
-        execute(cmd);
+        execute(cmd, true);
     }
 
     printf("goodbye!\n");
