@@ -28,7 +28,8 @@ void errmsg (char *msg) {
 bool interrupted = false;
 // signal handler so that SIGINT does not kill main
 void stay_on_ctrlc () {
-    printf("  SIGINT\n");
+    signal(SIGINT, stay_on_ctrlc);
+    printf("\nSIGINT\n");
     interrupted = true;
 }
 
@@ -37,7 +38,7 @@ void exit_on_ctrlc () {
     exit(131);
 }
 
-// return code from string
+// return code from string for exit function
 int retcode(char* arg) {
     int total = 0;
     if (arg == NULL) return 0;
@@ -53,7 +54,6 @@ int retcode(char* arg) {
 // whose names are given in cmd->input/output/error.
 // append is like output but the file should be extended rather
 // than overwritten.
-
 void apply_redirects (struct cmd *cmd) {
     if (cmd->output) { dup2(open(cmd->output, O_WRONLY | O_CREAT | O_TRUNC, 0644), STDOUT_FILENO); }
     if (cmd->error) { dup2(open(cmd->error, O_WRONLY | O_CREAT | O_TRUNC, 0644), STDERR_FILENO); }
@@ -64,7 +64,6 @@ void apply_redirects (struct cmd *cmd) {
 // The function execute() takes a command parsed at the command line.
 // The structure of the command is explained in output.c.
 // Returns the exit code of the command in question.
-
 int execute (struct cmd* cmd, bool is_toplevel) {
     switch (cmd->type) {
         case C_PLAIN: {
@@ -197,10 +196,9 @@ int main (int argc, char** argv) {
     printf("welcome to %s!\n", NAME);
     sprintf(prompt,"(%d) %s> ", getpid(), NAME);
 
-    signal(SIGINT, stay_on_ctrlc);
-
     bool loop = true;
     while (loop) {
+        signal(SIGINT, stay_on_ctrlc);
         interrupted = false;
         char* line = readline(prompt);
         if (interrupted) continue; // user pressed Ctrl+C; wait for next command after the newline
